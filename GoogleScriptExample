@@ -1,5 +1,5 @@
 
-var ss =SpreadsheetApp.openById("1rApyr6c3hqBZDNKn_LPi6sNrW1Okf_9GCmiSbmBNkhg");
+var ss =SpreadsheetApp.openById("Insert your sheetID here");
 var baseURL = "showcase.fabnet.io/api/dataclient/";
 var JobSheetName = "Jobs";
 var MachineSheetName = "Machinelist";
@@ -16,7 +16,7 @@ function onOpen() {
 function GetFabnetData(apicall){
   var headers = {
     "User-Agent": "APIExample",
-    "Authorization": "Token 54e4c752396a1b7fde0e7a617a30ea7ac4bf5355"
+    "Authorization": "Token InsertYourFabnetTokenHere"
   }
   var options = {
     "method": "get",
