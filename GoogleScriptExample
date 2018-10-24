@@ -1,0 +1,130 @@
+
+var ss =SpreadsheetApp.openById("1rApyr6c3hqBZDNKn_LPi6sNrW1Okf_9GCmiSbmBNkhg");
+var baseURL = "showcase.fabnet.io/api/dataclient/";
+var JobSheetName = "Jobs";
+var MachineSheetName = "Machinelist";
+
+function onOpen() {
+  //Add functions to menu
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('fabnet.io')
+  .addItem('Update Machines', 'GetMachineList')
+  .addItem('Update Jobslist', 'GetJobList')
+  .addToUi()
+}
+
+function GetFabnetData(apicall){
+  var headers = {
+    "User-Agent": "APIExample",
+    "Authorization": "Token 54e4c752396a1b7fde0e7a617a30ea7ac4bf5355"
+  }
+  var options = {
+    "method": "get",
+    "headers": headers
+  }
+  var apiresponse = UrlFetchApp.fetch(baseURL + apicall + "/", options);
+  return JSON.parse(apiresponse);
+}
+
+function GetMachineList()
+{ 
+  //Check if sheet exists
+  if(ss.getSheetByName(MachineSheetName)==null){
+    ss.insertSheet(MachineSheetName);
+  }
+  
+  var sheet_machines = ss.getSheetByName(MachineSheetName);
+  sheet_machines.clearContents();
+  var range_machinelist = "A1:E1000"; //Increase if needed
+  var machinedatalist = sheet_machines.getRange(range_machinelist).getValues();
+  
+  //Table Headers
+  machinedatalist[0][0] = "ID";
+  machinedatalist[0][1] = "Name";
+  machinedatalist[0][2] = "Family";
+  machinedatalist[0][3] = "Status";
+  machinedatalist[0][4] = "Last seen";
+  
+  var nextpage = 1;
+  var LineNr = 1;
+  
+  while (nextpage >0){
+    
+    //Get data
+    var Machinelist = GetFabnetData("machines/?page="+nextpage);
+    nextpage = Machinelist["next"];
+    var MachinesOnly = Machinelist["results"];
+    
+    //Fill table
+    for (e in MachinesOnly){
+      machinedatalist[LineNr][0] = MachinesOnly[e].id;
+      machinedatalist[LineNr][1] = MachinesOnly[e].name;
+      machinedatalist[LineNr][2] = MachinesOnly[e].machinefamily;
+      machinedatalist[LineNr][3] = MachinesOnly[e].status;
+      machinedatalist[LineNr][4] = MachinesOnly[e].last_seen_online;
+      
+      LineNr++;
+    }
+  }
+  
+  sheet_machines.getRange(range_machinelist).setValues(machinedatalist);
+  DeleteEmptyRows("Machinelist");
+}
+
+function GetJobList()
+{
+  //Check if sheet exists
+  if(ss.getSheetByName(JobSheetName)==null){
+    ss.insertSheet(JobSheetName);
+  }
+  
+  var sheet_jobs = ss.getSheetByName(JobSheetName);
+  sheet_jobs.clearContents();
+  var range_jobs = "A1:G1000"; //Increase if needed
+  var jobdatalist = sheet_jobs.getRange(range_jobs).getValues();
+  
+  //Table Headers
+  jobdatalist[0][0] = "Name";
+  jobdatalist[0][1] = "Family";
+  jobdatalist[0][2] = "Started";
+  jobdatalist[0][3] = "Stoped";
+  jobdatalist[0][4] = "Time unlocked";
+  jobdatalist[0][5] = "Time running";
+  jobdatalist[0][6] = "Usergroup";
+  
+  var nextpage = 1;
+  var LineNr = 1;
+  
+  while (nextpage >0){
+    
+    //Get data
+    var Joblist = GetFabnetData("jobs/?page="+nextpage);
+    nextpage = Joblist["next"];
+    var JobsOnly = Joblist["results"];
+    
+    //Fill table
+    for (e in JobsOnly){
+      jobdatalist[LineNr][0] = JobsOnly[e].machine;
+      jobdatalist[LineNr][1] = JobsOnly[e].machinefamily;
+      jobdatalist[LineNr][2] = JobsOnly[e].dt_start;
+      jobdatalist[LineNr][3] = JobsOnly[e].dt_end;
+      jobdatalist[LineNr][4] = JobsOnly[e].dur_unlocked;
+      jobdatalist[LineNr][5] = JobsOnly[e].dur_running;
+      jobdatalist[LineNr][6] = JobsOnly[e].usergroup;
+      LineNr++;
+    }
+  }
+  
+  sheet_jobs.getRange(range_jobs).setValues(jobdatalist);
+  DeleteEmptyRows("Jobs");
+}
+
+function DeleteEmptyRows(sheetname){
+  var target_sheet = ss.getSheetByName(sheetname);
+  var maxRows = target_sheet.getMaxRows(); 
+  var lastRow = target_sheet.getLastRow();
+  if (maxRows-lastRow != 0)
+  {
+    target_sheet.deleteRows(lastRow+1, maxRows-lastRow);
+  }
+}
