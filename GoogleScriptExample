@@ -1,5 +1,5 @@
 
-var ss =SpreadsheetApp.openById("Insert your sheetID here");
+var ss =SpreadsheetApp.openById("Add here your sheet ID");
 var baseURL = "showcase.fabnet.io/api/dataclient/";
 var JobSheetName = "Jobs";
 var MachineSheetName = "Machinelist";
@@ -10,19 +10,36 @@ function onOpen() {
   ui.createMenu('fabnet.io')
   .addItem('Update Machines', 'GetMachineList')
   .addItem('Update Jobslist', 'GetJobList')
+  .addItem('Set fabnet token', 'setToken')
   .addToUi()
 }
 
 function GetFabnetData(apicall){
   var headers = {
     "User-Agent": "APIExample",
-    "Authorization": "Token InsertYourFabnetTokenHere"
+    "Authorization": "Token AddHereYourFabnetDataToken"
   }
   var options = {
     "method": "get",
     "headers": headers
   }
-  var apiresponse = UrlFetchApp.fetch(baseURL + apicall + "/", options);
+  var apiresponse = UrlFetchApp.fetch(baseURL + apicall , options);
+  return JSON.parse(apiresponse);
+}
+
+function GetNextPage(apicall){
+  Logger.log("Running next page");
+  Logger.log(apicall);
+  
+  var headers = {
+    "User-Agent": "APIExample",
+    "Authorization": "Token 00bc6f94640b0db0b8d2cdbd6364fdd3a3df8748"
+  }
+  var options = {
+    "method": "get",
+    "headers": headers
+  }
+  var apiresponse = UrlFetchApp.fetch(apicall , options);
   return JSON.parse(apiresponse);
 }
 
@@ -48,11 +65,11 @@ function GetMachineList()
   var nextpage = 1;
   var LineNr = 1;
   
-  while (nextpage >0){
+  //Get data
+  var Machinelist = GetFabnetData("machines/?page="+nextpage);
+  
+  while (nextpage != null){
     
-    //Get data
-    var Machinelist = GetFabnetData("machines/?page="+nextpage);
-    nextpage = Machinelist["next"];
     var MachinesOnly = Machinelist["results"];
     
     //Fill table
@@ -64,6 +81,11 @@ function GetMachineList()
       machinedatalist[LineNr][4] = MachinesOnly[e].last_seen_online;
       
       LineNr++;
+    }
+    
+    nextpage = Machinelist["next"];
+    if (nextpage != null){
+      Machinelist = GetNextPage(nextpage);
     }
   }
   
@@ -80,7 +102,7 @@ function GetJobList()
   
   var sheet_jobs = ss.getSheetByName(JobSheetName);
   sheet_jobs.clearContents();
-  var range_jobs = "A1:G1000"; //Increase if needed
+  var range_jobs = "A1:G6000"; //Increase if needed
   var jobdatalist = sheet_jobs.getRange(range_jobs).getValues();
   
   //Table Headers
@@ -95,11 +117,11 @@ function GetJobList()
   var nextpage = 1;
   var LineNr = 1;
   
-  while (nextpage >0){
+  //Get data
+  var Joblist = GetFabnetData("jobs/?page=" + nextpage);
+  
+  while (nextpage != null){
     
-    //Get data
-    var Joblist = GetFabnetData("jobs/?page="+nextpage);
-    nextpage = Joblist["next"];
     var JobsOnly = Joblist["results"];
     
     //Fill table
@@ -112,6 +134,12 @@ function GetJobList()
       jobdatalist[LineNr][5] = JobsOnly[e].dur_running;
       jobdatalist[LineNr][6] = JobsOnly[e].usergroup;
       LineNr++;
+    }
+    
+    nextpage = Joblist["next"];
+    
+    if (nextpage != null){
+      Joblist = GetNextPage(nextpage);
     }
   }
   
@@ -127,4 +155,11 @@ function DeleteEmptyRows(sheetname){
   {
     target_sheet.deleteRows(lastRow+1, maxRows-lastRow);
   }
+}
+
+function setToken() {
+  var html = HtmlService.createHtmlOutputFromFile('Index');
+  SpreadsheetApp.getUi()
+  SpreadsheetApp.getUi() // Or DocumentApp or SlidesApp or FormApp.
+  .showSidebar(html);
 }
