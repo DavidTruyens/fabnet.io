@@ -1,23 +1,31 @@
 
-var ss =SpreadsheetApp.openById("Add here your sheet ID");
-var baseURL = "showcase.fabnet.io/api/dataclient/";
+//Credentials
+var ss =SpreadsheetApp.openById("1m8FykrlBQ3pvmhRtLCxEPMiFvk1loVvGRsS62jkHOBQ");
+var baseURL = "stad-antwerpen.fabnet.io/api/dataclient/";
+var fabnetToken = "Token c00a125818f2f908e7edf1d24c6de0fac304a9bf"
+
+//Sheet setup
 var JobSheetName = "Jobs";
 var MachineSheetName = "Machinelist";
+var UserSheetName = "Users";
 
+//Loading UI
 function onOpen() {
   //Add functions to menu
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('fabnet.io')
   .addItem('Update Machines', 'GetMachineList')
   .addItem('Update Jobslist', 'GetJobList')
+  .addItem('Get user statistics', 'GetUsers')
   .addItem('Set fabnet token', 'setToken')
   .addToUi()
 }
 
+//API Calls to fabnet
 function GetFabnetData(apicall){
   var headers = {
     "User-Agent": "APIExample",
-    "Authorization": "Token AddHereYourFabnetDataToken"
+    "Authorization": fabnetToken
   }
   var options = {
     "method": "get",
@@ -27,13 +35,14 @@ function GetFabnetData(apicall){
   return JSON.parse(apiresponse);
 }
 
+//Next Page API Call
 function GetNextPage(apicall){
   Logger.log("Running next page");
   Logger.log(apicall);
   
   var headers = {
     "User-Agent": "APIExample",
-    "Authorization": "Token 00bc6f94640b0db0b8d2cdbd6364fdd3a3df8748"
+    "Authorization": fabnetToken
   }
   var options = {
     "method": "get",
@@ -43,6 +52,8 @@ function GetNextPage(apicall){
   return JSON.parse(apiresponse);
 }
 
+//fills the machine sheet with a list of the machines
+//including statuses
 function GetMachineList()
 { 
   //Check if sheet exists
@@ -93,6 +104,55 @@ function GetMachineList()
   DeleteEmptyRows("Machinelist");
 }
 
+
+//ToDo: Just add a row, not resetting the whole sheet
+function GetUsers(){
+  //Check if sheet exists
+  if(ss.getSheetByName(UserSheetName)==null){
+    ss.insertSheet(UserSheetName);
+  }
+  
+  var sheet_users = ss.getSheetByName(UserSheetName);
+  var range_headers = "A1:G1"; //Increase if needed
+  var headers;
+  
+  //Table Headers
+  headers[0][0] = "Date";
+  headers[0][1] = "Registered Today";
+  headers[0][2] = "Registered This Week";
+  headers[0][3] = "Registered This Month";
+  headers[0][4] = "Active Today";
+  headers[0][5] = "Active This Week";
+  headers[0][6] = "Active This Month";
+  
+  sheet_users.getRange(range_headers).setValues(headers);
+  var range_userlist = "A2:G2";
+  var userdatalist = sheet_users.getRange(range_userlist).getValues();
+  
+  //Get data
+  var Userlist = GetFabnetData("userstatistics/?");
+  Logger.log(Userlist);
+  
+  var maxRowNr = sheet_users.getMaxRows(); 
+  Logger.log(maxRowNr);
+  //Fill table
+  //var RegisterdOnly = UsersOnly
+  userdatalist[maxRowNr][1] = Userlist["registered"].day;
+  userdatalist[maxRowNr][2] = Userlist["registered"].week;
+  userdatalist[maxRowNr][3] = Userlist["registered"].year;
+  userdatalist[maxRowNr][4] = Userlist["active"].day;
+  userdatalist[maxRowNr][5] = Userlist["active"].week;  
+  userdatalist[maxRowNr][6] = Userlist["active"].year;
+  
+  sheet_users.getRange(range_userlist).setValues(userdatalist);
+  //DeleteEmptyRows(UserSheetName);
+  
+}
+
+//fills the job sheet with all jobs
+//for preformance it's best to add the latest jobs, 
+//not downloading all of them at once
+//Todo: get the latest entry, then only get jobs from a later date
 function GetJobList()
 {
   //Check if sheet exists
@@ -102,7 +162,7 @@ function GetJobList()
   
   var sheet_jobs = ss.getSheetByName(JobSheetName);
   sheet_jobs.clearContents();
-  var range_jobs = "A1:G6000"; //Increase if needed
+  var range_jobs = "A1:G10000"; //Increase if needed
   var jobdatalist = sheet_jobs.getRange(range_jobs).getValues();
   
   //Table Headers
@@ -147,6 +207,7 @@ function GetJobList()
   DeleteEmptyRows("Jobs");
 }
 
+//Cleans up the sheet
 function DeleteEmptyRows(sheetname){
   var target_sheet = ss.getSheetByName(sheetname);
   var maxRows = target_sheet.getMaxRows(); 
@@ -157,6 +218,63 @@ function DeleteEmptyRows(sheetname){
   }
 }
 
+function GetYesterdaysJobs(){
+  //Check if sheet exists
+  if(ss.getSheetByName(JobSheetName)==null){
+    ss.insertSheet(JobSheetName);
+  }
+  
+  var sheet_jobs = ss.getSheetByName(JobSheetName);
+  var lastRow = sheet_jobs.getLastRow();
+  var range_jobs = "A" + String(lastRow+1) + ":G" + String(lastRow+1001)
+  
+  var jobdatalist = sheet_jobs.getRange(range_jobs).getValues();
+  
+  var nextpage = 1;
+  var LineNr = 0;
+  
+  /* getting date wip */
+  var today = Utilities.formatDate(new Date(), SpreadsheetApp.getActive().getSpreadsheetTimeZone(), "yyyy-MM-dd")
+
+  var yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  
+  var yesterday =  Utilities.formatDate(yesterdayDate, SpreadsheetApp.getActive().getSpreadsheetTimeZone(), "yyyy-MM-dd")
+ 
+  /* WIP */
+  //Get data
+  //http://stad-antwerpen.fabnet.io/api/dataclient/jobs/?job_finished_after=2019-05-22&job_finished_before=2019-07-23&page=2"
+  var Joblist = GetFabnetData("jobs/?job_finished_after="+ yesterday +"&job_finished_before="+ today +"&page=" + nextpage);
+  
+  while (nextpage != null){
+    
+    var JobsOnly = Joblist["results"];
+    
+    //Fill table
+    for (e in JobsOnly){
+      jobdatalist[LineNr][0] = JobsOnly[e].machine;
+      jobdatalist[LineNr][1] = JobsOnly[e].machinefamily;
+      jobdatalist[LineNr][2] = JobsOnly[e].dt_start;
+      jobdatalist[LineNr][3] = JobsOnly[e].dt_end;
+      jobdatalist[LineNr][4] = JobsOnly[e].dur_unlocked;
+      jobdatalist[LineNr][5] = JobsOnly[e].dur_running;
+      jobdatalist[LineNr][6] = JobsOnly[e].usergroup;
+      LineNr++;
+    }
+    
+    nextpage = Joblist["next"];
+    
+    if (nextpage != null){
+      Joblist = GetNextPage(nextpage);
+    }
+  }
+  
+  sheet_jobs.getRange(range_jobs).setValues(jobdatalist);
+  DeleteEmptyRows("Jobs");
+}
+
+//test to change the token via the UI instead of via code
+//WIP
 function setToken() {
   var html = HtmlService.createHtmlOutputFromFile('Index');
   SpreadsheetApp.getUi()
